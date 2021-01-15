@@ -30,3 +30,11 @@ already have a general idea about:
   threads, it allows you to wait on subprocesses spawned by Python in
   parallel (unlike threads, the task-switching is cooperative, not
   pre-emptive, so it's sequential by design, GIL or no GIL)
+
+If you'd like an introduction and/or refresher, I recommend watching
+[this talk by Raymond Hettinger][rh], which covers all of the above
+topics, and reading the [Trio tutorial][tt], which delves specifically
+into async in a very accessible way.
+
+[rh]: https://youtu.be/9zinZmE3Ogk
+[tt]: https://trio.readthedocs.io/en/stable/tutorial.html
