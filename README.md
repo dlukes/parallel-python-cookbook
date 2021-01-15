@@ -34,7 +34,9 @@ already have a general idea about:
 If you'd like an introduction and/or refresher, I recommend watching
 [this talk by Raymond Hettinger][rh], which covers all of the above
 topics, and reading the [Trio tutorial][tt], which delves specifically
-into async in a very accessible way.
+into async in a very accessible way. There's also a [great talk on
+concurrency, async and Trio by Nathaniel J. Smith][njs].
 
 [rh]: https://youtu.be/9zinZmE3Ogk
 [tt]: https://trio.readthedocs.io/en/stable/tutorial.html
+[njs]: https://youtu.be/oLkfnc_UMcE
