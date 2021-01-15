@@ -16,6 +16,11 @@ import multiprocessing as mp
 # '.imap()' or '.imap_unordered()' (see below) because they're lazy,
 # whereas with 'concurrent.futures', you'd have to resort to a more
 # complicated setup involving manual management of queues.
+#
+# Since the underlying mechanism is the same, the handling of (mutable)
+# globals is the same -- each child process gets its own separate copy
+# of the global. Again, see the other snippet for an example and
+# details.
 
 
 def worker(x):

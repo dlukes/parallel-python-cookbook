@@ -17,6 +17,17 @@ def log(tid, x):
     print(f"Worker {tid}, job {x} done at ...{ts}.")
 
 
+FOO = []
+
+
+def worker_accessing_global_mutable_resource(x):
+    if x not in FOO:
+        # this sleeps the current thread, not the entire process
+        time.sleep(1)
+        FOO.append(x)
+    return threading.get_ident(), id(FOO), FOO
+
+
 def main():
     # As of 3.8, the default for 'max_workers' with 'ThreadPoolExecutor'
     # is 'min(os.cpu_count() + 4, 32)', which is a three-way compromise
@@ -77,6 +88,57 @@ def main():
             # something went wrong while computing the future.
             tid, x = fut.result()
             log(tid, x)
+        print()
+
+        # Threads are part of the same process, which means they share
+        # the same address space, which in turn means all worker threads
+        # and parent threads have access to the same globals. So the
+        # same instance of the global list 'FOO' is actually shared by
+        # all threads, which race to update it (workers) or print it
+        # (main thread).
+        #
+        # Now, in practice (at least in CPython), the GIL saves you from
+        # memory corruption because only one thread is allowed to run at
+        # a time. But you can still have logic bugs -- e.g. here, the
+        # intent is to append to 'FOO' without creating duplicates, but
+        # since there's no atomic check-and-append for lists, you can
+        # end up with duplicates anyway.
+        #
+        # 	Worker 6138818560 has FOO at address 4354886336 with contents [5, 0]
+        # 	Worker 6155644928 has FOO at address 4354886336 with contents [5, 0]
+        # 	Worker 6138818560 has FOO at address 4354886336 with contents [5, 0, 4, 3]
+        # 	Worker 6155644928 has FOO at address 4354886336 with contents [5, 0, 4, 3]
+        # 	Worker 6138818560 has FOO at address 4354886336 with contents [5, 0, 4, 3, 2, 1]
+        # 	Worker 6155644928 has FOO at address 4354886336 with contents [5, 0, 4, 3, 2, 1]
+        # 	Worker 6138818560 has FOO at address 4354886336 with contents [5, 0, 4, 3, 2, 1, 1]
+        #
+        # The right way to do this is to either use atomic operations
+        # (e.g. maybe your elements are hashable, in which case 'FOO'
+        # might be a set, and 'set.add()' is atomic) or a lock. But
+        # locking is tricky, in real-world code, you can easily end up
+        # with a deadlock, or write a very complicated and brittle
+        # threaded version of your program which executes fully
+        # sequentially, much like the original non-threaded one, except
+        # possibly slower due to the context-switching overhead, because
+        # the locks are too coarse-grained to allow any parallelism.
+        #
+        # So a better approach than locks is to have resources managed
+        # by dedicated daemon threads and send them requests via atomic
+        # message queues. See Raymond Hettinger's excellent talk for a
+        # sketch of how this is done and why locks should be avoided:
+        # https://youtu.be/9zinZmE3Ogk?t=2889
+        #
+        # It might also be the case that what you need is not one global
+        # 'FOO', but for each thread to have *its own* global 'FOO'
+        # (which is incidentally what happens when using process-based
+        # parallelism, see 02-concurrent_futures_processes.py). That can
+        # be achieved in a threading context using thread locals -- see
+        # 'threading.local()'.
+        for fut in cf.as_completed(
+            ex.submit(worker_accessing_global_mutable_resource, t) for t in tasks + [1]
+        ):
+            tid, foo_id, foo = fut.result()
+            print(f"Worker {tid} has FOO at address {foo_id} with contents {foo}")
 
         # Finally, if you'd like to process potentially unbounded
         # streams of data in real time, it looks like you'll have to use

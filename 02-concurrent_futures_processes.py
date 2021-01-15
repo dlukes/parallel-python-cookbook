@@ -16,19 +16,27 @@ def log(tid, x):
     print(f"Worker {tid}, job {x} done at ...{ts}.")
 
 
+FOO = set()
+
+
+def worker_accessing_global_mutable_resource(x):
+    FOO.add(x)
+    return os.getpid(), id(FOO), FOO
+
+
 def main():
     # The multiprocessing context allows you to specify how processes
     # are started:
     #
     # - "forkserver" is safe to mix with threading and fast, but only
-    # 	works on Unix platforms which support passing file descriptors
-    # 	over Unix pipes
+    #   works on Unix platforms which support passing file descriptors
+    #   over Unix pipes
     # - "spawn" is safe w.r.t. to threading but slow; it's the default
-    # 	on macOS and Windows
+    #   on macOS and Windows
     # - "fork" is fast but can lead to problems with multithreaded code,
-    # 	cf. https://pythonspeed.com/articles/python-multiprocessing/;
-    # 	only available and default on Unix
-    ctx = mp.get_context("forkserver")
+    #   cf. https://pythonspeed.com/articles/python-multiprocessing/;
+    #   only available and default on Unix
+    ctx = mp.get_context("fork")
 
     # The default for 'max_workers' with 'ProcessPoolExecutor' is
     # 'os.cpu_count()', because it expects CPU-bound tasks, but if you
@@ -105,6 +113,74 @@ def main():
             # something went wrong while computing the future.
             tid, x = fut.result()
             log(tid, x)
+        print()
+
+        # If you'd like to share state between processes... Well, you
+        # can't, that's what process separation is for. You can pass
+        # around data via queues and the like, which is how you get back
+        # results from workers into your main process, but that data
+        # must be pickled first, which involves overhead and
+        # restrictions (you can't pickle everything).
+        #
+        # If you just naively create a mutable global and try to update
+        # it from multiple workers, it won't work as intended -- each
+        # worker gets its own separate copy of the global. That's
+        # because a worker process receives a copy of everything in the
+        # parent process when it's created.
+        #
+        # Note that there's a subtle gotcha which might make it look
+        # like your workers are actually sharing the same global: if you
+        # inspect the memory address of the global via 'id()', the
+        # number might be the same across multiple workers, even though
+        # they're actually different objects and different memory
+        # locations under the hood.
+        #
+        # This only happens when the method of starting child processes
+        # involves forking, for two reasons:
+        #
+        # 1. Forking creates a perfect clone of the parent process,
+        #    which continues execution from the same point. That means
+        #    that all the resources are laid out the same way as in the
+        #    parent process.
+        # 2. 'id()' doesn't show you actual physical memory locations,
+        #    it shows you addresses which the OS presents to your
+        #    process, which is affected by virtual addressing. And since
+        #    a parent process and its fork are clones of each other, the
+        #    virtual address memory layout is the same and all objects
+        #    live at the same (virtual) addresses in both processes, all
+        #    the while being physically separate.
+        #
+        # This potentially confusing state of things is demonstrated in
+        # the output below: the addresses of the 'FOO' global are
+        # identical, in both workers, but the contents are clearly
+        # separate.
+        #
+        # 	Worker 31397 has FOO at address 4376767392 with contents {5}
+        # 	Worker 31398 has FOO at address 4376767392 with contents {0}
+        # 	Worker 31397 has FOO at address 4376767392 with contents {4, 5}
+        # 	Worker 31398 has FOO at address 4376767392 with contents {0, 3}
+        # 	Worker 31397 has FOO at address 4376767392 with contents {2, 4, 5}
+        # 	Worker 31398 has FOO at address 4376767392 with contents {0, 1, 3}
+        #
+        # But if you change the multiprocessing context to 'spawn'
+        # above, then instead of forking, workers will be spawned as new
+        # processes (which is slower) and you should get different
+        # addresses in the output:
+        #
+        # 	Worker 32171 has FOO at address 4349491904 with contents {5}
+        # 	Worker 32172 has FOO at address 4388403904 with contents {0}
+        # 	Worker 32171 has FOO at address 4349491904 with contents {4, 5}
+        # 	Worker 32172 has FOO at address 4388403904 with contents {0, 3}
+        # 	Worker 32171 has FOO at address 4349491904 with contents {2, 4, 5}
+        # 	Worker 32172 has FOO at address 4388403904 with contents {0, 1, 3}
+        #
+        # For more on the gotchas of virtual addressing as related to
+        # Python multiprocessing, see: https://kaushikghose.wordpress.com/2016/08/26/python-global-state-multiprocessing-and-other-ways-to-hang-yourself/
+        for fut in cf.as_completed(
+            ex.submit(worker_accessing_global_mutable_resource, t) for t in tasks
+        ):
+            pid, foo_id, foo = fut.result()
+            print(f"Worker {pid} has FOO at address {foo_id} with contents {foo}")
 
         # Finally, if you'd like to process potentially unbounded
         # streams of data in real time, it looks like you'll have to use
