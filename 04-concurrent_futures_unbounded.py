@@ -1,3 +1,16 @@
+# NOTE: This is all very complicated and very probably wrong in subtle
+# or not-so-subtle ways. The machinery to submit new tasks and retrieve
+# results is absurdly brittle and hard to navigate. I'll try and revisit
+# this if I ever have a breakthrough on how to best achieve this with
+# 'concurrent.futures', but maybe it's just not the right tool for
+# unbounded streams of data.
+#
+# For the time being, if you need threaded processing of unbounded
+# streams, you're probably better off using the vanilla 'threading'
+# module and daemon threads, which make it unnecessary to worry about a
+# thread pool, because you never need to assign new tasks to the
+# threads. See 07-vanilla_threading_unbounded.py.
+
 import time
 import random
 import threading
