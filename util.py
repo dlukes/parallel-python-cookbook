@@ -1,9 +1,9 @@
 def print_box(msg):
     assert "\n" not in msg
-    xxxxx = "─" * (len(msg) + 2)
+    ᜭᜭᜭᜭᜭ = "─" * (len(msg) + 2)
     print(
-      "\r┌", xxxxx, "┐\n",
+      "\r┌", ᜭᜭᜭᜭᜭ, "┐\n",
         "│ ", msg, " │\n",
-        "└", xxxxx, "┘",
+        "└", ᜭᜭᜭᜭᜭ, "┘",
         sep=""
     )
