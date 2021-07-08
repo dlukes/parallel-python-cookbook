@@ -29,8 +29,13 @@ def consumer():
     while True:
         job_id, x = INPUTQ.get()
         sp.run(["sleep", f"{x}s"])
-        INPUTQ.task_done()
         OUTPUTQ.put((threading.get_ident(), job_id, x))
+        # We call '.task_done()' so that the counter of unfinished tasks
+        # doesn't grow to infinity, but it's mostly cosmetic because we
+        # never '.join()' on the queues (i.e. we never check that the
+        # counter has gone down to 0) -- when interrupted, we just drop
+        # all unfinished tasks and exit.
+        INPUTQ.task_done()
 
 
 def main():

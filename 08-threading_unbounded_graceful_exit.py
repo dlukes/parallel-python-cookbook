@@ -4,6 +4,8 @@ import threading
 import subprocess as sp
 from queue import Queue
 
+from util import print_box
+
 # This is a variant of 07-threading_unbounded_abrupt_exit.py with a more
 # graceful exit (as if it weren't obvious from the name). In other
 # words, all tasks that were submitted to the 'INPUTQ' prior to exit
@@ -55,8 +57,8 @@ def consumer():
     while True:
         job_id, x = INPUTQ.get()
         sp.run(["sleep", f"{x}s"])
-        INPUTQ.task_done()
         OUTPUTQ.put((threading.get_ident(), job_id, x))
+        INPUTQ.task_done()
 
 
 # We now also have a separate logger thread, which does what our main
@@ -72,31 +74,25 @@ def logger():
         OUTPUTQ.task_done()
 
 
-def print_box(msg):
-    assert "\n" not in msg
-    line = "─" * (len(msg) + 2)
-    print("\r┌" + line + "┐\n", "│ ", msg, " │\n", "└" + line + "┘", sep="")
-
-
 def main():
     print_box("wait for a few jobs to complete, then press Ctrl-C")
 
     # We only need to hang onto the join handle of the producer thread,
     # as it's the only one we need to join at a specific point in the
     # execution of our program.
-    pt = threading.Thread(target=producer, daemon=True)
+    pt = threading.Thread(target=producer)
     pt.start()
     for _ in range(CONSUMER_WORKERS):
         threading.Thread(target=consumer, daemon=True).start()
     threading.Thread(target=logger, daemon=True).start()
 
+    # The job of the main thread now is to just wait for a signal that
+    # the application should exit. That's why we've moved the logging to
+    # a different thread, because the signal would terminate that loop,
+    # whereas we actually want the logging to continue as the program is
+    # winding down in an orderly fashion (which is orchestrated by the
+    # main thread, see below).
     try:
-        # The job of the main thread now is to just wait for a signal
-        # that the application should exit. That's why we've moved the
-        # logging to a different thread, because the signal would
-        # terminate that loop, whereas we actually want the logging to
-        # continue as the program is winding down in an orderly fashion
-        # (which is orchestrated by the main thread, see below).
         threading.Event().wait()
     except KeyboardInterrupt:
         print_box("caught keyboard interrupt")
