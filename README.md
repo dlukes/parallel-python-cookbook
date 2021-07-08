@@ -2,10 +2,12 @@ Python parallel cookbook
 ========================
 
 A set of recipes on how to use [`concurrent.futures`][cf],
-[`multiprocessing`][mp] and the [`trio`][trio] async runtime (an
-alternative to stdlib's `asyncio`) to run stuff in parallel with Python.
+[`threading`][thread], [`multiprocessing`][mp] and the [`trio`][trio]
+async runtime (an alternative to stdlib's `asyncio`) to run stuff in
+parallel with Python.
 
 [cf]: https://docs.python.org/3/library/concurrent.futures.html
+[thread]: https://docs.python.org/3/library/threading.html
 [mp]: https://docs.python.org/3/library/multiprocessing.html
 [trio]: https://trio.readthedocs.io/
 
