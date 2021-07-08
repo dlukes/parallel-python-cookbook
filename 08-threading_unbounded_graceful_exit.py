@@ -58,6 +58,13 @@ def consumer():
         job_id, x = INPUTQ.get()
         sp.run(["sleep", f"{x}s"])
         OUTPUTQ.put((threading.get_ident(), job_id, x))
+        # TODO: placement of task_done is tricky and can lead to bugs in
+        # combination with daemon threads, e.g. here if above put, we
+        # might end up in a state where both queues will be empty and
+        # join will unblock, and only then will consumer put the next
+        # item on OUTPUTQ, but by then the program will be exiting and
+        # logger might get killed before it gets a chance to process
+        # that last item. see 09.
         INPUTQ.task_done()
 
 

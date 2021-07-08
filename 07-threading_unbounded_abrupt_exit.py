@@ -35,6 +35,9 @@ def consumer():
         # never '.join()' on the queues (i.e. we never check that the
         # counter has gone down to 0) -- when interrupted, we just drop
         # all unfinished tasks and exit.
+        #
+        # TODO: mention ordering of task_done can be tricky when
+        # combined with daemon threads, can lead to bugs, see 09...
         INPUTQ.task_done()
 
 
