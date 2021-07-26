@@ -105,8 +105,8 @@ def main():
     # when multiple threads try printing at the same time, or worse, see
     # <https://stackoverflow.com/q/40356200>.
     #
-    # But actually seeing that garbled output (the boxes of messages
-    # printed with 'print_box()' often get interspersed with lines from
+    # But occasionally seeing that garbled output (the boxes of messages
+    # printed with 'print_box()' can get interspersed with lines from
     # the logger thread) is a good reminder that you shouldn't do this,
     # so let's leave it as is.
     #
