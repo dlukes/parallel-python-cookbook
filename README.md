@@ -39,6 +39,17 @@ topics, and reading the [Trio tutorial][tt], which delves specifically
 into async in a very accessible way. There's also a [great talk on
 concurrency, async and Trio by Nathaniel J. Smith][njs].
 
+------------------------------------------------------------------------
+
+Copyright © 2021 [ÚČNK](https://korpus.cz)/David Lukeš
+
+[![CC-BY-NC-SA 4.0][cc-img]][cc]
+
+This work is licensed under a [Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International License][cc].
+
 [rh]: https://youtu.be/9zinZmE3Ogk
 [tt]: https://trio.readthedocs.io/en/stable/tutorial.html
 [njs]: https://youtu.be/oLkfnc_UMcE
+[cc]: http://creativecommons.org/licenses/by-nc-sa/4.0/
+[cc-img]: https://i.creativecommons.org/l/by-nc-sa/4.0/88x31.png
