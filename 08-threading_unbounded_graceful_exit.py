@@ -58,6 +58,15 @@ def consumer():
         job_id, x = INPUTQ.get()
         sp.run(["sleep", f"{x}s"])
         OUTPUTQ.put((threading.get_ident(), job_id, x))
+        # NOTE: The placement of '.task_done()' calls can be tricky to
+        # get right, leading to subtle bugs. E.g. here, if we swap it
+        # with the preceding '.put()', we might end up in a state where
+        # both queues will be momentarily empty and their joins in the
+        # main thread will unblock, and *only after that* will the
+        # consumer put the next item on 'OUTPUTQ'. However, by then, the
+        # program will be in the process of exiting and the logger might
+        # get killed before it gets a chance to handle that last item.
+        # See 10-task_done_placement.py for more details.
         INPUTQ.task_done()
 
 
@@ -161,13 +170,21 @@ def main():
     # '.join()' methods, which will make our program wait until they're
     # emptied out.
     #
-    # The order doesn't really matter, it's not like you can mess it up
-    # and accidentally end up waiting forever (deadlocking) because you
-    # put one '.join()' before the other. It's the loops in the two
+    # It's important to realize that it's the loops in the two
     # daemon threads that ensure the water gets drained out, not the
     # calls to '.join()' themselves. Their purpose is just to say, don't
     # move past this point unless both queues are empty, and we know
     # they'll both empty out eventually.
+    #
+    # Still, the ordering of those '.join()' calls matters: they should
+    # be in the same order as data flows through the pipeline.
+    # Intuitively, in order to be sure that a later pipe is empty *for
+    # good* (as opposed to just happening to be empty *at the moment*),
+    # you need to be sure that there isn't any more stuff incoming
+    # through the earlier stages of the pipeline. This is also discussed
+    # in more detail in 10-task_done_placement.py, which is even more of
+    # a toy example so that you can switch joins around and observe how
+    # that affects behavior.
     print_box("waiting for queues to empty")
     INPUTQ.join()
     OUTPUTQ.join()
