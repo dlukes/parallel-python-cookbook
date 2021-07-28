@@ -11,9 +11,22 @@ def worker(x):
     return os.getpid(), x
 
 
-def log(tid, x):
+def log(pid, x):
     ts = str(int(time.time()))[-2:]
-    print(f"Worker {tid}, job {x} done at ...{ts}.")
+    pid = str(pid)[-2:]
+    print(f"Worker {pid}, job {x} done at ...{ts}.")
+
+
+# also add threading examples, where there's a race condition without
+# some form of synchronization or thread locals?
+FOO = set()
+
+
+def worker_accessing_global_mutable_resource(x):
+    FOO.add(x)
+    time.sleep(1)
+    # id is the same because of virtual addressing: https://kaushikghose.wordpress.com/2016/08/26/python-global-state-multiprocessing-and-other-ways-to-hang-yourself/
+    return os.getpid(), id(FOO), FOO
 
 
 def main():
@@ -45,12 +58,12 @@ def main():
         # code below, which prints the first three results
         # simultaneously, once the first (longest-running) task is done:
         #
-        # 	Worker 3264662, job 5 done at ...62.
-        # 	Worker 3264659, job 0 done at ...62.
-        # 	Worker 3264659, job 4 done at ...62.
-        # 	Worker 3264659, job 3 done at ...64.
-        # 	Worker 3264662, job 2 done at ...64.
-        # 	Worker 3264662, job 1 done at ...65.
+        # 	Worker ...62, job 5 done at ...62.
+        # 	Worker ...59, job 0 done at ...62.
+        # 	Worker ...59, job 4 done at ...62.
+        # 	Worker ...59, job 3 done at ...64.
+        # 	Worker ...62, job 2 done at ...64.
+        # 	Worker ...62, job 1 done at ...65.
         #
         # Beware of the 'chunksize' argument, it can be tricky. On the
         # surface, it seems simple: if I have 2 workers, 6 tasks and a
@@ -94,17 +107,38 @@ def main():
         # futures driven to completion by different executors at the
         # same time. The output of the code below is the following:
         #
-        # 	Worker 3264662, job 0 done at ...65.
-        # 	Worker 3264662, job 4 done at ...69.
-        # 	Worker 3264659, job 5 done at ...70.
-        # 	Worker 3264659, job 2 done at ...72.
-        # 	Worker 3264662, job 3 done at ...72.
-        # 	Worker 3264659, job 1 done at ...73.
+        # 	Worker ...62, job 0 done at ...65.
+        # 	Worker ...62, job 4 done at ...69.
+        # 	Worker ...59, job 5 done at ...70.
+        # 	Worker ...59, job 2 done at ...72.
+        # 	Worker ...62, job 3 done at ...72.
+        # 	Worker ...59, job 1 done at ...73.
         for fut in cf.as_completed(ex.submit(worker, t) for t in tasks):
             # Accessing 'fut.result()' might raise an exception if
             # something went wrong while computing the future.
             tid, x = fut.result()
             log(tid, x)
+        print()
+
+        # Each worker ends up getting its own private copy of the global
+        # FOO defined in the parent process, so there's no need to worry
+        # about data races and stomping on each other's data. On the
+        # other hand, it also means you can't use globals to communicate
+        # between different processes: even though the source code might
+        # look like there's only one FOO somewhere in shared memory,
+        # that's not the case.
+        #
+        # 	Worker ...62 has FOO at address 4321429760 with contents {5}
+        # 	Worker ...59 has FOO at address 4321429760 with contents {0}
+        # 	Worker ...62 has FOO at address 4321429760 with contents {4, 5}
+        # 	Worker ...59 has FOO at address 4321429760 with contents {0, 3}
+        # 	Worker ...62 has FOO at address 4321429760 with contents {2, 4, 5}
+        # 	Worker ...59 has FOO at address 4321429760 with contents {0, 1, 3}
+        for fut in cf.as_completed(
+            ex.submit(worker_accessing_global_mutable_resource, t) for t in tasks
+        ):
+            pid, foo_id, foo = fut.result()
+            print(f"Worker {pid} has FOO at address {foo_id} with contents {foo}")
 
         # Finally, if you'd like to process potentially unbounded
         # streams of data in real time, it looks like you'll have to use
